@@ -65,7 +65,6 @@
   ═══════════════════════════════════════════════════════════════════════════════
 */
 #include <Arduino_BuiltIn.h>
-#include <ArduinoHttpClient.h>
 #include <WiFiS3.h>
 #include <RTClib.h>
 #include <ArduinoJson.h>
@@ -93,8 +92,8 @@ const unsigned long POST_INTERVAL_MS = 2000UL;
 const unsigned long MATRIX_INTERVAL = 250UL;
 
 // Timing configuration
-const unsigned long CYCLE_TIME = 15000; // Total cycle: 15 seconds
-const unsigned long STEP_TIME = 5;     // Time per color step 19 ms (approx 785 steps total)
+const unsigned long CYCLE_TIME = 5000; // Total cycle: 15 seconds
+const unsigned long STEP_TIME = 3;     // Time per color step 19 ms (approx 785 steps total)
 
 // ── DHT22 ─────────────────────────────────────────────────────────────────────
 #define DHT_PIN  4
@@ -103,7 +102,13 @@ DHT dht(DHT_PIN, DHT_TYPE);
 
 // ── Globals ───────────────────────────────────────────────────────────────────
 WiFiClient  wifiClient;
-HttpClient  http(wifiClient, SERVER_HOST, SERVER_PORT);
+
+enum HttpRequestState { HTTP_IDLE, HTTP_READY, HTTP_READING };
+HttpRequestState httpRequestState = HTTP_IDLE;
+String pendingHttpBody;
+String httpResponse;
+unsigned long httpRequestStarted = 0;
+const unsigned long HTTP_TIMEOUT_MS = 5000UL;
 
 unsigned long lastPostTime  = 0;
 unsigned long lastVersionPostTime  = 0;
@@ -200,8 +205,10 @@ void loop() {
     printStats();
   }
 
+  serviceHttpRequest();
+
   if (currentMillis - lastVersionPostTime >= MATRIX_INTERVAL) {
-    lastVersionPostTime = currentMillis;
+    lastVersionPostTime += MATRIX_INTERVAL;
     updateMatrix("V2.0");
   }
 }
@@ -210,6 +217,11 @@ void loop() {
 //  Read DHT22 and POST JSON to REST endpoint
 // ═══════════════════════════════════════════════════════════════════════════════
 void buildSensorData() {
+
+  if (httpRequestState != HTTP_IDLE) {
+    Serial.println(F("[POST] Previous request still active; sample skipped"));
+    return;
+  }
 
   postCount++;
 
@@ -239,48 +251,80 @@ void buildSensorData() {
   doc["passValue"] = postCount;
   doc["dateValue"] = dateTime;
 
-  String body;
-  serializeJson(doc, body);
-
-  executeHttpRequest(doc, body);
+  serializeJson(doc, pendingHttpBody);
+  httpRequestState = HTTP_READY;
 
   // ── 3. HTTP POST ───────────────────────────────────────────────────────────
   Serial.println(F("\n────────────────────────────"));
   Serial.print(F("[POST] → "));
-  Serial.println(body);
+  Serial.println(pendingHttpBody);
 
   updateOled(temperature, humidity, lightOhms, postCount, dateTime);
 }
 
-void executeHttpRequest(ArduinoJson::JsonDocument doc, arduino::String body){
-  http.beginRequest();
-  http.post(API_PATH);
-  http.sendHeader("Content-Type", "application/json");
-  http.sendHeader("Content-Length", String(body.length()));
-  http.sendHeader("X-Device-Id", DEVICE_ID);
-  http.sendHeader("Connection", "close");
+void serviceHttpRequest() {
+  if (httpRequestState == HTTP_IDLE) return;
 
-  http.beginBody();
-  http.print(body);
-  http.endRequest();
+  if (httpRequestState == HTTP_READY) {
+    if (!wifiClient.connect(SERVER_HOST, SERVER_PORT)) {
+      Serial.println(F("[HTTP] Connection failed"));
+      errorCount++;
+      pendingHttpBody = "";
+      httpRequestState = HTTP_IDLE;
+      return;
+    }
+
+    wifiClient.print(F("POST "));
+    wifiClient.print(API_PATH);
+    wifiClient.println(F(" HTTP/1.1"));
+    wifiClient.print(F("Host: "));
+    wifiClient.println(SERVER_HOST);
+    wifiClient.println(F("Content-Type: application/json"));
+    wifiClient.print(F("Content-Length: "));
+    wifiClient.println(pendingHttpBody.length());
+    wifiClient.print(F("X-Device-Id: "));
+    wifiClient.println(DEVICE_ID);
+    wifiClient.println(F("Connection: close"));
+    wifiClient.println();
+    wifiClient.print(pendingHttpBody);
+
+    httpResponse = "";
+    httpRequestStarted = millis();
+    httpRequestState = HTTP_READING;
+    return;
+  }
+
+  byte bytesRead = 0;
+  while (wifiClient.available() && bytesRead < 64) {
+    char c = wifiClient.read();
+    if (httpResponse.length() < 1024) httpResponse += c;
+    bytesRead++;
+  }
+
+  bool timedOut = millis() - httpRequestStarted >= HTTP_TIMEOUT_MS;
+  if (wifiClient.connected() && !timedOut) return;
+
+  wifiClient.stop();
+  int firstSpace = httpResponse.indexOf(' ');
+  int statusCode = firstSpace >= 0
+    ? httpResponse.substring(firstSpace + 1, firstSpace + 4).toInt()
+    : -1;
 
   // ── 4. Response ────────────────────────────────────────────────────────────
-  int statusCode = http.responseStatusCode();
-  String response   = http.responseBody();
-
   Serial.print(F("[HTTP] Status : "));
   Serial.println(statusCode);
 
-  Serial.print(F("[HTTP] Body   : "));
-  Serial.println(response);
-
-  if (statusCode >= 200 && statusCode < 300) {
+  if (!timedOut && statusCode >= 200 && statusCode < 300) {
     Serial.println(F("[HTTP] ✔ Saved to database"));
     successPostCount++;
   } else {
     Serial.println(F("[HTTP] ✘ Server error – check backend logs"));
     errorCount++;
   }
+
+  pendingHttpBody = "";
+  httpResponse = "";
+  httpRequestState = HTTP_IDLE;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
