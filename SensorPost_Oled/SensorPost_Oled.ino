@@ -28,8 +28,19 @@
   Pin VSCL → Arduino A5 (or SCL pin)
   Pin SDA → Arduino A4 (or SDA pin)
 
+  RGB LED PINOUT On Arduino
+  Pin Red 11
+  Pin Green 10
+  Pin Blue 9
+
+  DS3231 RTC Clock Module
+  Pin VCC 5v
+  Pin GND - GND
+  Pin SDA - SDA On Arduino Parrellel with OLED
+  Pin SCL - SCL On Arduino Parrellel with OLED
+
   ── Required Libraries (Arduino Library Manager) ─────────────────────────────
-  • DHT sensor library
+  • DHT sensor library (DHT.h)
   • ArduinoHttpClient  by Arduino      (0.6.x)
   • Adafruit_SSD1306 
   • Adafruit_GFX
@@ -37,8 +48,15 @@
   • ArduinoGraphics
   • Arduino_LED_Matrix
   • Wire
+  • DS3231 by (by NorthernWidget)
   • ArduinoJson        by Benoit Blanchon (7.x)
   • WiFiS3             – bundled with "Arduino UNO R4 Boards" board package
+
+  Included files
+  • arduino_secrets
+  • oled_functions
+  • rgb_led_functions
+  • arduino_uno_matrix
 
   ── Board Package (Boards Manager) ───────────────────────────────────────────
   "Arduino UNO R4 Boards" by Arduino LLC
@@ -74,7 +92,7 @@ const unsigned long MATRIX_INTERVAL = 250UL;
 
 // Timing configuration
 const unsigned long CYCLE_TIME = 15000; // Total cycle: 15 seconds
-const unsigned long STEP_TIME = 19;     // Time per color step (approx 785 steps total)
+const unsigned long STEP_TIME = 5;     // Time per color step 19 ms (approx 785 steps total)
 
 // ── DHT22 ─────────────────────────────────────────────────────────────────────
 #define DHT_PIN  4
@@ -145,17 +163,6 @@ void loop() {
 
   unsigned long currentMillis = millis();
  
-  if (currentMillis - lastPostTime >= POST_INTERVAL_MS) {
-    lastPostTime = currentMillis;
-    buildSensorData();
-    printStats();
-  }
-
-  if (currentMillis - lastVersionPostTime >= MATRIX_INTERVAL) {
-    lastVersionPostTime = currentMillis;
-    updateMatrix("V2.0");
-  }
-
   if (currentMillis - lastStepTime >= STEP_TIME) {
     lastStepTime = currentMillis;
 
@@ -177,6 +184,17 @@ void loop() {
       colorState = (colorState + 1) % 6; // Cycle through 6 color transitions
       setNextTargetColor();
     }
+  }
+
+  if (currentMillis - lastPostTime >= POST_INTERVAL_MS) {
+    lastPostTime = currentMillis;
+    buildSensorData();
+    printStats();
+  }
+
+  if (currentMillis - lastVersionPostTime >= MATRIX_INTERVAL) {
+    lastVersionPostTime = currentMillis;
+    updateMatrix("V2.0");
   }
 }
 
