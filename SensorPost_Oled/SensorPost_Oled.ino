@@ -52,9 +52,9 @@
 #include <DS3231.h>
 #include <Wire.h>
 #include "arduino_secrets.h"
-#include "oled_functions.h"
-#include "rgb_led_functions.h"
-#include "arduino_uno_matrix.h"
+#include "src/oled_functions.h"
+#include "src/rgb_led_functions.h"
+#include "src/arduino_uno_matrix.h"
 
 // ── Wi-Fi credentials ─────────────────────────────────────────────────────────
 char WIFI_SSID[] = SECRET_SSID;
@@ -71,6 +71,7 @@ const char DEVICE_ID[]   = "arduino-r4-01";
 // ── Post interval ─────────────────────────────────────────────────────────────
 const unsigned long POST_INTERVAL_MS = 2000UL;
 const unsigned long MATRIX_INTERVAL = 250UL;
+const unsigned long COLOR_INTERVAL = 13500UL;
 
 // ── DHT22 ─────────────────────────────────────────────────────────────────────
 #define DHT_PIN  4
@@ -82,6 +83,8 @@ WiFiClient  wifiClient;
 HttpClient  http(wifiClient, SERVER_HOST, SERVER_PORT);
 
 unsigned long lastPostTime  = 0;
+unsigned long lastVersionPostTime  = 0;
+unsigned long lastColorSequenceTime  = 0;
 unsigned long successPostCount     = 0;
 unsigned long errorCount    = 0;
 unsigned long postCount    = 0;
@@ -139,12 +142,15 @@ void loop() {
     printStats();
   }
 
-  if (currentMillis - lastPostTime >= MATRIX_INTERVAL) {
-    lastPostTime = currentMillis;
+  if (currentMillis - lastVersionPostTime >= MATRIX_INTERVAL) {
+    lastVersionPostTime = currentMillis;
     updateMatrix("V2.0");
   }
 
-  updateRgbLed(9,9,164);
+ if (currentMillis - lastColorSequenceTime >= COLOR_INTERVAL) {
+    lastColorSequenceTime = currentMillis;
+    actuateColorChange();
+ }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
