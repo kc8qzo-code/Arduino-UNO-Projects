@@ -49,6 +49,8 @@
 #include <WiFiS3.h>
 #include <ArduinoJson.h>
 #include <DHT.h>
+#include <DS3231.h>
+#include <Wire.h>
 #include "arduino_secrets.h"
 #include "oled_functions.h"
 #include "rgb_led_functions.h"
@@ -84,16 +86,26 @@ unsigned long successPostCount     = 0;
 unsigned long errorCount    = 0;
 unsigned long postCount    = 0;
 
+DS3231 rtc;
+
 int lightOhms = 0;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 void setup() {
-  Serial.begin(19200);
+  Serial.begin(115200);
   while (!Serial && millis() < 3000);
 
   printBanner();
   dht.begin();
   delay(2000);   // DHT11 needs ~2 s after power-on before first reliable read
+
+  // Start I2C communication
+  Wire.begin();
+  Serial.println("Reading DS3231 clock...");
+
+  // Set the time and date to match your computer's compile time.
+  // This automatically sets the RTC to the exact moment you upload the code.
+  // rtc.adjust(DateTime(__DATE__, __TIME__));
 
   initializeMatrix();
   
@@ -132,7 +144,7 @@ void loop() {
     updateMatrix("V2.0");
   }
 
-  updateRgbLed(146,23,171);
+  updateRgbLed(9,9,164);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -147,6 +159,9 @@ void buildSensorData() {
   float temperature = dht.readTemperature(true);
   float r_fixed = 10000.0; // 10k resistor   
   int lightOhms = analogRead(A0);
+
+  // Read the current date and time from the DS3231
+  DateTime now = RTClib::now();
   
   // Validate – DHT22 returns NaN on read failure
   if (isnan(humidity) || isnan(temperature)) {
@@ -155,11 +170,14 @@ void buildSensorData() {
     return;
   }
 
+  String dateTime = buildDateTime(now);
+
   JsonDocument doc;
   doc["temperature"] = round2(temperature);
   doc["humidity"]    = round2(humidity);
   doc["light"]  = lightOhms;
   doc["passValue"] = postCount;
+  doc["dateValue"] = dateTime;
 
   String body;
   serializeJson(doc, body);
@@ -171,7 +189,7 @@ void buildSensorData() {
   Serial.print(F("[POST] → "));
   Serial.println(body);
 
-  updateOled(temperature, humidity, lightOhms, postCount);
+  updateOled(temperature, humidity, lightOhms, postCount, dateTime);
 }
 
 void executeHttpRequest(ArduinoJson::JsonDocument doc, arduino::String body){
@@ -235,11 +253,54 @@ void connectWiFi() {
   }
 }
 
+String buildDateTime(DateTime now){
+
+  String localValue = "";
+  // Print date: MM/DD/YYYY
+  localValue += returnTwoDigits(now.month()) + "/";
+  Serial.print("/");
+
+  localValue += returnTwoDigits(now.day()) + "/";
+  Serial.print("/");
+
+  localValue += String(now.year()) + " ";
+  Serial.print(now.year());
+
+  Serial.print(" ");
+
+  // Print time: HH:MM:SS
+  localValue += returnTwoDigits(now.hour()) + ":";
+  Serial.print(":");
+  
+  localValue += returnTwoDigits(now.minute()) + ":";
+  Serial.print(":");
+
+  localValue += returnTwoDigits(now.second());
+
+  Serial.println();
+
+  return localValue;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Helpers
 // ═══════════════════════════════════════════════════════════════════════════════
 float round2(float val) {
   return roundf(val * 100.0f) / 100.0f;
+}
+
+String returnTwoDigits(uint8_t value) {
+  String localValue = "";
+  if (value < 10) {
+    Serial.print("0");
+    localValue += "0";
+  }
+
+  String v1 = "localValue: " + localValue + "value: " + value;
+  Serial.println(v1);
+  Serial.print(value);
+  localValue += value;
+  return localValue;
 }
 
 void printStats() {
@@ -254,6 +315,6 @@ void printBanner() {
   Serial.println(F("╔══════════════════════════════════════╗"));
   Serial.println(F("║  Arduino Uno R4 WiFi – DHT22 Logger ║"));
   Serial.println(F("║  Target : 192.168.1.239:8080         ║"));
-  Serial.println(F("║  Sensor : DHT22  Interval : 5 s      ║"));
+  Serial.println(F("║  Sensor : DHT22  Interval : 2 s      ║"));
   Serial.println(F("╚══════════════════════════════════════╝"));
 }
