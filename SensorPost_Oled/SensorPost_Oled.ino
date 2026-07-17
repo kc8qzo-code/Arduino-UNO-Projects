@@ -52,9 +52,9 @@
 #include <DS3231.h>
 #include <Wire.h>
 #include "arduino_secrets.h"
-#include "src/oled_functions.h"
-#include "src/rgb_led_functions.h"
-#include "src/arduino_uno_matrix.h"
+#include "oled_functions.h"
+#include "rgb_led_functions.h"
+#include "arduino_uno_matrix.h"
 
 // ── Wi-Fi credentials ─────────────────────────────────────────────────────────
 char WIFI_SSID[] = SECRET_SSID;
@@ -71,7 +71,10 @@ const char DEVICE_ID[]   = "arduino-r4-01";
 // ── Post interval ─────────────────────────────────────────────────────────────
 const unsigned long POST_INTERVAL_MS = 2000UL;
 const unsigned long MATRIX_INTERVAL = 250UL;
-const unsigned long COLOR_INTERVAL = 13500UL;
+
+// Timing configuration
+const unsigned long CYCLE_TIME = 15000; // Total cycle: 15 seconds
+const unsigned long STEP_TIME = 19;     // Time per color step (approx 785 steps total)
 
 // ── DHT22 ─────────────────────────────────────────────────────────────────────
 #define DHT_PIN  4
@@ -84,10 +87,14 @@ HttpClient  http(wifiClient, SERVER_HOST, SERVER_PORT);
 
 unsigned long lastPostTime  = 0;
 unsigned long lastVersionPostTime  = 0;
-unsigned long lastColorSequenceTime  = 0;
+unsigned long lastStepTime = 0;
 unsigned long successPostCount     = 0;
 unsigned long errorCount    = 0;
 unsigned long postCount    = 0;
+
+int colorState = 0;// Current and target RGB values
+int currentR = 255, currentG = 0, currentB = 0;
+int targetR = 255, targetG = 0, targetB = 0;
 
 DS3231 rtc;
 
@@ -123,6 +130,8 @@ void setup() {
     Serial.println(F("RGB LED Pin Allocation Failed"));
     for(;;); // Don't proceed, loop forever
  }
+
+ updateRgbLed(currentR, currentG, currentB);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -147,10 +156,28 @@ void loop() {
     updateMatrix("V2.0");
   }
 
- if (currentMillis - lastColorSequenceTime >= COLOR_INTERVAL) {
-    lastColorSequenceTime = currentMillis;
-    actuateColorChange();
- }
+  if (currentMillis - lastStepTime >= STEP_TIME) {
+    lastStepTime = currentMillis;
+
+    // Smoothly transition current color toward target
+    if (currentR < targetR) currentR++;
+    else if (currentR > targetR) currentR--;
+
+    if (currentG < targetG) currentG++;
+    else if (currentG > targetG) currentG--;
+
+    if (currentB < targetB) currentB++;
+    else if (currentB > targetB) currentB--;
+
+    // Apply color to the LED pins
+    updateRgbLed(currentR, currentG, currentB);
+
+    // If target is reached, transition to the next state
+    if (currentR == targetR && currentG == targetG && currentB == targetB) {
+      colorState = (colorState + 1) % 6; // Cycle through 6 color transitions
+      setNextTargetColor();
+    }
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -307,6 +334,42 @@ String returnTwoDigits(uint8_t value) {
   Serial.print(value);
   localValue += value;
   return localValue;
+}
+
+// State machine to define the next color to fade into
+void setNextTargetColor() {
+  switch (colorState) {
+    case 0: // Red -> Yellow
+      targetR = 255; 
+      targetG = 255; 
+      targetB = 0;   
+      break;
+    case 1: // Yellow -> Green
+      targetR = 0;
+      targetG = 255;
+      targetB = 0;   
+      break;
+    case 2: // Green -> Cyan
+      targetR = 0;
+      targetG = 255; 
+      targetB = 255; 
+      break;
+    case 3: // Cyan -> Blue
+      targetR = 0;   
+      targetG = 0;   
+      targetB = 255; 
+      break; 
+    case 4: // Blue -> Magenta
+      targetR = 255; 
+      targetG = 0;   
+      targetB = 255; 
+      break; 
+    case 5: // Magenta -> Red
+      targetR = 255; 
+      targetG = 0;   
+      targetB = 0;   
+      break; 
+  }
 }
 
 void printStats() {
