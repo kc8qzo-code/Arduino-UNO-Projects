@@ -13,7 +13,7 @@ void initializeMatrix() {
   matrix.begin();
 }
 
-// Method to update on-board Matrix 
+// Method to update on-board Matrix
 void updateMatrix(const String& text) {
   if (text != previousText) {
     previousText = text;
