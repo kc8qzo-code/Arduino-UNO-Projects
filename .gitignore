@@ -1,1 +1,5 @@
 arduino_secrets*
+.agents
+.build
+.git
+.vscode
