@@ -9,6 +9,32 @@ const char *const DAYS_OF_WEEK[7] = {
     "Friday",
     "Saturday"};
 
+bool parseUTCDate(const String &utcTime, DateTime &dateTime)
+{
+  unsigned int year;
+  unsigned int month;
+  unsigned int day;
+  unsigned int hour;
+  unsigned int minute;
+  unsigned int second;
+
+  if (sscanf(utcTime.c_str(),
+             "%4u-%2u-%2uT%2u:%2u:%2u",
+             &year, &month, &day, &hour, &minute, &second) != 6)
+  {
+    return false;
+  }
+
+  const DateTime parsed(year, month, day, hour, minute, second);
+  if (!parsed.isValid())
+  {
+    return false;
+  }
+
+  dateTime = parsed;
+  return true;
+}
+
 String buildReadableDate(const DateTime &dateTime)
 {
   char dateBuffer[11];

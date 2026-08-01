@@ -1,75 +1,14 @@
 #include "http_functions.h"
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
 #include <HTTPClient.h>
-#include <RTClib.h>
 #include <WiFi.h>
 
 #include "arduino_secrets.h"
-#include "date_functions.h"
+#include "oled_functions.h"
 #include "wifi_functions.h"
 
 namespace
 {
   constexpr unsigned long HTTP_TIMEOUT_MS = 5000;
-
-  bool parseUTCDate(const String &utcTime, DateTime &dateTime)
-  {
-    unsigned int year;
-    unsigned int month;
-    unsigned int day;
-    unsigned int hour;
-    unsigned int minute;
-    unsigned int second;
-
-    if (sscanf(utcTime.c_str(),
-               "%4u-%2u-%2uT%2u:%2u:%2u",
-               &year, &month, &day, &hour, &minute, &second) != 6)
-    {
-      return false;
-    }
-
-    const DateTime parsed(year, month, day, hour, minute, second);
-    if (!parsed.isValid())
-    {
-      return false;
-    }
-
-    dateTime = parsed;
-    return true;
-  }
-
-  void updateTimeDisplay(Adafruit_SSD1306 &display, const String &utcTime)
-  {
-    DateTime dateTime;
-    if (!parseUTCDate(utcTime, dateTime))
-    {
-      Serial.print("[TIME] Invalid UTC timestamp: ");
-      Serial.println(utcTime);
-      return;
-    }
-
-    display.clearDisplay();
-    display.setTextColor(SSD1306_WHITE);
-    display.setTextSize(1);
-    display.setCursor(0, 0);
-    display.println("CURRENT TIME (UTC)");
-
-    display.setTextSize(2);
-    display.setCursor(0, 15);
-    display.print(buildReadableTime(dateTime));
-
-    display.setTextSize(1);
-    display.setCursor(104, 21);
-    display.print(dateTime.hour() >= 12 ? "PM" : "AM");
-
-    display.setCursor(0, 42);
-    display.print(buildReadableDate(dateTime));
-
-    display.setCursor(0, 54);
-    display.print(DAYS_OF_WEEK[dateTime.dayOfTheWeek()]);
-    display.display();
-  }
 
   String createPayload(float temperature,
                        float humidity,
@@ -100,9 +39,12 @@ bool postSensorReading(float temperature,
                        uint8_t light,
                        unsigned long passValue,
                        const String &utcTime,
+                       Adafruit_SSD1306 &temperatureDisplay,
                        Adafruit_SSD1306 &timeDisplay)
 {
-  updateTimeDisplay(timeDisplay, utcTime);
+  OledFunctions::updateTimeDisplay(timeDisplay, utcTime);
+  OledFunctions::updateTemperatureDisplay(
+      temperatureDisplay, temperature, humidity);
 
   if (!connectToWiFi())
   {

@@ -18,6 +18,7 @@
 #include <Adafruit_SSD1306.h>
 #include "arduino_secrets.h"
 #include "http_functions.h"
+#include "oled_functions.h"
 #include "wifi_functions.h"
 #include "date_functions.h"
 
@@ -43,7 +44,7 @@ constexpr int SCREEN_HEIGHT = 64;
 constexpr int OLED_RESET_PIN = -1;
 
 // Refresh periods
-constexpr unsigned long DHT_REFRESH_MS = 2500;
+constexpr unsigned long DHT_REFRESH_MS = 5000;
 const int ONBOARD_LED_PIN = 2;
 
 // Wire uses ESP32 I2C controller 0 for the temperature OLED and RTC.
@@ -64,6 +65,10 @@ Adafruit_SSD1306 timeDisplay(
     SCREEN_HEIGHT,
     &timeI2C,
     OLED_RESET_PIN);
+
+float temperature = 100.13F;
+float humidity = 101.12F;
+uint8_t light = 52;
 
 unsigned long lastDhtRefresh = 0;
 unsigned long lastPostTime = 0;
@@ -136,8 +141,6 @@ void setup()
         "DS3231 RTC was not found.");
   }
 
-  updateTemperatureDisplay();
-
   lastDhtRefresh = millis();
 
   Serial.println();
@@ -180,9 +183,6 @@ void loop()
     Serial.print(" at millis=");
     Serial.println(millis());
 
-    const float temperature = 100.13F;
-    const float humidity = 101.12F;
-    const uint8_t light = 52;
     const DateTime now = rtc.now();
     const String utcTime = buildUTCDate(now);
 
@@ -192,6 +192,7 @@ void loop()
             light,
             passValue,
             utcTime,
+            temperatureDisplay,
             timeDisplay))
     {
       successfulPosts++;
@@ -201,8 +202,6 @@ void loop()
     ledState = !ledState;
     digitalWrite(ONBOARD_LED_PIN, ledState);
 
-    Serial.print("[LED] GPIO 2 is now ");
-    Serial.println(ledState ? "HIGH" : "LOW");
     Serial.print("[STATS] Attempts: ");
     Serial.print(postAttempts);
     Serial.print(", successful: ");
@@ -216,7 +215,10 @@ void loop()
   if (currentMillis - lastDhtRefresh >= DHT_REFRESH_MS)
   {
     lastDhtRefresh = currentMillis;
-    updateTemperatureDisplay();
+    //   temperature = dht.readTemperature();
+    //   humidity = dht.readHumidity();
+    humidity++;
+    temperature++;
   }
 }
 
@@ -243,68 +245,4 @@ void showStartupScreen(
   display.println();
   display.println(message);
   display.display();
-}
-
-// ============================================================
-// Temperature OLED
-// ============================================================
-
-void updateTemperatureDisplay()
-{
-  const float humidity = 55.123f;
-  const float temperatureC = 22.1f;
-
-  temperatureDisplay.clearDisplay();
-  temperatureDisplay.setTextColor(SSD1306_WHITE);
-
-  temperatureDisplay.setTextSize(1);
-  temperatureDisplay.setCursor(0, 0);
-  temperatureDisplay.println("TEMPERATURE");
-
-  if (isnan(humidity) || isnan(temperatureC))
-  {
-    temperatureDisplay.setTextSize(2);
-    temperatureDisplay.setCursor(8, 20);
-    temperatureDisplay.println("DHT22");
-
-    temperatureDisplay.setTextSize(1);
-    temperatureDisplay.println("Read failed");
-    temperatureDisplay.display();
-
-    Serial.println("DHT22 read failed.");
-    return;
-  }
-
-  const float temperatureF = (temperatureC * 9.0F / 5.0F) + 32.0F;
-
-  // Large Fahrenheit reading
-  temperatureDisplay.setTextSize(2);
-  temperatureDisplay.setCursor(8, 13);
-  temperatureDisplay.print(temperatureF, 1);
-
-  temperatureDisplay.setTextSize(2);
-  temperatureDisplay.print(" F");
-
-  // Celsius reading
-  temperatureDisplay.setTextSize(1);
-  temperatureDisplay.setCursor(8, 43);
-  temperatureDisplay.print("Celsius:  ");
-  temperatureDisplay.print(temperatureC, 1);
-  temperatureDisplay.println(" C");
-
-  // Humidity reading
-  temperatureDisplay.setCursor(8, 54);
-  temperatureDisplay.print("Humidity: ");
-  temperatureDisplay.print(humidity, 1);
-  temperatureDisplay.println(" %");
-
-  temperatureDisplay.display();
-
-  Serial.print("Temperature: ");
-  Serial.print(temperatureF, 1);
-  Serial.print(" F / ");
-  Serial.print(temperatureC, 1);
-  Serial.print(" C, Humidity: ");
-  Serial.print(humidity, 1);
-  Serial.println(" %");
 }

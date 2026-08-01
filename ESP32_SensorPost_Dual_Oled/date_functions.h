@@ -6,6 +6,7 @@
 
 extern const char *const DAYS_OF_WEEK[7];
 
+bool parseUTCDate(const String &utcTime, DateTime &dateTime);
 String buildReadableDate(const DateTime &dateTime);
 String buildReadableTime(const DateTime &dateTime);
 String buildUTCDate(const DateTime &dateTime);

@@ -12,6 +12,7 @@ bool postSensorReading(float temperature,
                        uint8_t light,
                        unsigned long passValue,
                        const String &utcTime,
+                       Adafruit_SSD1306 &temperatureDisplay,
                        Adafruit_SSD1306 &timeDisplay);
 
 #endif
