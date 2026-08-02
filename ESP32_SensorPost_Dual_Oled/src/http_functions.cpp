@@ -17,11 +17,14 @@ namespace
                        const String &utcTime)
   {
     String payload;
+
+    const float temperatureF = (temperature * 9.0F / 5.0F) + 32.0F;
+
     payload.reserve(96);
     payload += "{\"temperature\":";
-    payload += String(temperature, 2);
+    payload += String(temperatureF, 1);
     payload += ",\"humidity\":";
-    payload += String(humidity, 2);
+    payload += String(humidity, 1);
     payload += ",\"light\":";
     payload += String(light);
     payload += ",\"passValue\":";

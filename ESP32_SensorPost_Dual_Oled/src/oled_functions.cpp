@@ -4,6 +4,20 @@
 #include "oled_functions.h"
 #include "date_functions.h"
 
+void OledFunctions::showStartupScreen(Adafruit_SSD1306 &display,
+                                      const char *message)
+{
+  display.clearDisplay();
+  display.setTextColor(SSD1306_WHITE);
+  display.setTextSize(1);
+  display.setCursor(0, 0);
+
+  display.println("ESP32 Sensor Clock");
+  display.println();
+  display.println(message);
+  display.display();
+}
+
 bool OledFunctions::updateTimeDisplay(Adafruit_SSD1306 &display,
                                       const String &utcTime)
 {
@@ -18,15 +32,15 @@ bool OledFunctions::updateTimeDisplay(Adafruit_SSD1306 &display,
   display.clearDisplay();
   display.setTextColor(SSD1306_WHITE);
   display.setTextSize(1);
-  display.setCursor(0, 0);
+  display.setCursor(7, 0);
   display.println("CURRENT TIME (UTC)");
 
-  display.setTextSize(1);
+  display.setTextSize(2);
   display.setCursor(0, 16);
   display.print(buildReadableTime(dateTime));
 
   display.setTextSize(1);
-  display.setCursor(98, 19);
+  display.setCursor(108, 22);
   display.print(dateTime.hour() >= 12 ? "PM" : "AM");
 
   display.setCursor(0, 36);
@@ -45,10 +59,6 @@ void OledFunctions::updateTemperatureDisplay(Adafruit_SSD1306 &display,
   display.clearDisplay();
   display.setTextColor(SSD1306_WHITE);
 
-  display.setTextSize(1);
-  display.setCursor(0, 0);
-  display.println("TEMPERATURE");
-
   if (isnan(humidity) || isnan(temperatureC))
   {
     display.setTextSize(1);
@@ -63,21 +73,24 @@ void OledFunctions::updateTemperatureDisplay(Adafruit_SSD1306 &display,
     return;
   }
 
+  display.setTextSize(1);
+  display.setCursor(28, 0);
+  display.println("TEMPERATURE");
+  
   const float temperatureF = (temperatureC * 9.0F / 5.0F) + 32.0F;
 
-  display.setTextSize(1);
-  display.setCursor(8, 16);
-  display.print("Fahrenheit: ");
+  display.setTextSize(2);
+  display.setCursor(0, 16);
   display.print(temperatureF, 1);
   display.print(" F");
 
   display.setTextSize(1);
-  display.setCursor(8, 36);
+  display.setCursor(0, 36);
   display.print("Celsius:   ");
   display.print(temperatureC, 1);
   display.println(" C");
 
-  display.setCursor(8, 54);
+  display.setCursor(0, 54);
   display.print("Humidity: ");
   display.print(humidity, 1);
   display.println(" %");

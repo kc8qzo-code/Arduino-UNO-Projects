@@ -8,6 +8,9 @@ class Adafruit_SSD1306;
 class OledFunctions
 {
 public:
+  static void showStartupScreen(Adafruit_SSD1306 &display,
+                                const char *message);
+
   static bool updateTimeDisplay(Adafruit_SSD1306 &display,
                                 const String &utcTime);
 

@@ -17,10 +17,10 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include "arduino_secrets.h"
-#include "http_functions.h"
-#include "oled_functions.h"
-#include "wifi_functions.h"
-#include "date_functions.h"
+#include "src/http_functions.h"
+#include "src/oled_functions.h"
+#include "src/wifi_functions.h"
+#include "src/date_functions.h"
 
 // I2C bus 0: Temperature OLED + DS3231 RTC
 constexpr int I2C0_SDA_PIN = 21;
