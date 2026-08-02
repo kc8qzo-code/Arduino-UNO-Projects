@@ -22,8 +22,6 @@
 #include "wifi_functions.h"
 #include "date_functions.h"
 
-const unsigned long POST_INTERVAL_MS = 2000;
-
 // I2C bus 0: Temperature OLED + DS3231 RTC
 constexpr int I2C0_SDA_PIN = 21;
 constexpr int I2C0_SCL_PIN = 22;
@@ -44,7 +42,7 @@ constexpr int SCREEN_HEIGHT = 64;
 constexpr int OLED_RESET_PIN = -1;
 
 // Refresh periods
-constexpr unsigned long DHT_REFRESH_MS = 5000;
+const unsigned long POST_INTERVAL_MS = 2000UL;
 const int ONBOARD_LED_PIN = 2;
 
 // Wire uses ESP32 I2C controller 0 for the temperature OLED and RTC.
@@ -52,7 +50,7 @@ const int ONBOARD_LED_PIN = 2;
 TwoWire timeI2C(1);
 
 RTC_DS3231 rtc;
-// DHT dht(DHT_PIN, DHT_TYPE);
+DHT dht(DHT_PIN, DHT_TYPE);
 
 Adafruit_SSD1306 temperatureDisplay(
     SCREEN_WIDTH,
@@ -70,7 +68,6 @@ float temperature = 100.13F;
 float humidity = 101.12F;
 uint8_t light = 52;
 
-unsigned long lastDhtRefresh = 0;
 unsigned long lastPostTime = 0;
 unsigned long passValue = 1;
 unsigned long postAttempts = 0;
@@ -132,7 +129,7 @@ void setup()
       timeDisplay,
       "Starting DS3231...");
 
-  // dht.begin();
+  dht.begin();
 
   // Connect RTClib to I2C controller 0.
   if (!rtc.begin(&Wire))
@@ -140,8 +137,6 @@ void setup()
     haltWithMessage(
         "DS3231 RTC was not found.");
   }
-
-  lastDhtRefresh = millis();
 
   Serial.println();
   Serial.println("========================================");
@@ -186,6 +181,9 @@ void loop()
     const DateTime now = rtc.now();
     const String utcTime = buildUTCDate(now);
 
+    temperature = dht.readTemperature();
+    humidity = dht.readHumidity();
+
     if (postSensorReading(
             temperature,
             humidity,
@@ -210,15 +208,6 @@ void loop()
     Serial.println(passValue);
     Serial.println(", Sent Time: ");
     Serial.println(utcTime);
-  }
-
-  if (currentMillis - lastDhtRefresh >= DHT_REFRESH_MS)
-  {
-    lastDhtRefresh = currentMillis;
-    //   temperature = dht.readTemperature();
-    //   humidity = dht.readHumidity();
-    humidity++;
-    temperature++;
   }
 }
 

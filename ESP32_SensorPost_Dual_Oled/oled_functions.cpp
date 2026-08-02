@@ -67,12 +67,13 @@ void OledFunctions::updateTemperatureDisplay(Adafruit_SSD1306 &display,
 
   display.setTextSize(1);
   display.setCursor(8, 16);
+  display.print("Fahrenheit: ");
   display.print(temperatureF, 1);
   display.print(" F");
 
   display.setTextSize(1);
   display.setCursor(8, 36);
-  display.print("Celsius:  ");
+  display.print("Celsius:   ");
   display.print(temperatureC, 1);
   display.println(" C");
 
